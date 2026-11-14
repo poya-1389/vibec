@@ -70,3 +70,17 @@ This is an executable MVP, not a full Mira clone. It does not yet implement imag
 - Add privacy notice and data deletion flow before public launch.
 - Add rate limiting and abuse monitoring before opening to large audiences.
 - Test Stars in a test environment first.
+
+
+## VibeL 1.0 personality and controls (v1.1)
+
+- Public identity: Vibe / وایب, presented as VibeL 1.0 by VibeChat.
+- Support: `@ThePouYa`; creator: Pouya; creator channel: `@VibeChat`.
+- Persian/English welcome menu: Change language, Change model, Help, Support, Buy Premium.
+- The only selectable model label is `VibeL 1.0`. The configured AI provider remains an implementation detail.
+- Daily message limit defaults to unlimited (`FREE_DAILY_LIMIT=0`). The owner can set it at runtime with `/quota 20` or disable it with `/quota off`. `OWNER_ID` must be set to the owner's numeric Vibe user ID for owner commands.
+- Conversation memory: regular users retain 20 recent messages plus a rolling summary compacted after 40 stored messages; Pro users retain 50 recent messages plus a rolling summary compacted after 100 stored messages. `/reset` clears both recent history and summary.
+- In groups, the bot responds only when mentioned or when a user replies to a bot message. The bot must be allowed to receive those updates by the group privacy/access settings.
+- Text capabilities include conversation, translation, summarization, writing, coding/debugging, tutoring, brainstorming, analysis of supplied text, planning and context-aware replies.
+- Automatic group warnings, message reactions, media/file understanding, web search, and colored button styles are not enabled in this release. They require additional implementation and confirmation that Vibegram's deployed API supports the corresponding Telegram methods.
+- Vibegram's published developer page currently describes compatibility with Telegram Bot API 7.x and lists standard message/chat/file methods, long polling, webhooks and Mini Apps. Do not assume newer Telegram Bot API 10.x features are available on Vibegram until verified.

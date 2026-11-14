@@ -9,7 +9,7 @@ class Settings:
     owner_id: int = int(os.getenv("OWNER_ID", "0"))
     database_url: str = os.getenv("DATABASE_PATH", "/data/vibechat.db")
     default_language: str = os.getenv("DEFAULT_LANGUAGE", "fa")
-    free_daily_limit: int = int(os.getenv("FREE_DAILY_LIMIT", "15"))
+    free_daily_limit: int = int(os.getenv("FREE_DAILY_LIMIT", "0"))
     ai_timeout: float = float(os.getenv("AI_TIMEOUT", "45"))
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     groq_api_key: str = os.getenv("GROQ_API_KEY", "")

@@ -22,6 +22,14 @@ async def init_db():
             charge_id TEXT PRIMARY KEY, user_id INTEGER, payload TEXT,
             total_amount INTEGER, currency TEXT, created_at TEXT
         )""")
+        await db.execute("""CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY, value TEXT NOT NULL
+        )""")
+        await db.execute("""CREATE TABLE IF NOT EXISTS user_summaries (
+            user_id INTEGER PRIMARY KEY, summary TEXT NOT NULL DEFAULT '', updated_at TEXT
+        )""")
+        await db.execute("INSERT OR IGNORE INTO app_settings(key,value) VALUES('daily_limit',?)",
+                         (str(settings.free_daily_limit),))
         await db.commit()
 
 async def ensure_user(user_id: int, username: str | None):
@@ -45,7 +53,7 @@ async def set_language(user_id: int, lang: str):
         await db.execute("UPDATE users SET language=? WHERE user_id=?", (lang, user_id))
         await db.commit()
 
-async def get_history(user_id: int, limit: int = 12):
+async def get_history(user_id: int, limit: int = 20):
     async with aiosqlite.connect(settings.database_url) as db:
         cur = await db.execute(
             "SELECT role, content FROM messages WHERE user_id=? ORDER BY id DESC LIMIT ?",
@@ -66,6 +74,7 @@ async def add_exchange(user_id: int, user_text: str, assistant_text: str):
 async def clear_history(user_id: int):
     async with aiosqlite.connect(settings.database_url) as db:
         await db.execute("DELETE FROM messages WHERE user_id=?", (user_id,))
+        await db.execute("DELETE FROM user_summaries WHERE user_id=?", (user_id,))
         await db.commit()
 
 async def consume_free_quota(user_id: int) -> bool:
@@ -137,3 +146,52 @@ async def stats():
         c2 = await db.execute("SELECT COUNT(*) FROM subscriptions WHERE expires_at > ?", (datetime.now(timezone.utc).isoformat(),))
         subs = (await c2.fetchone())[0]
     return users, subs
+
+
+async def get_daily_limit() -> int:
+    async with aiosqlite.connect(settings.database_url) as db:
+        cur = await db.execute("SELECT value FROM app_settings WHERE key='daily_limit'")
+        row = await cur.fetchone()
+    return int(row[0]) if row else settings.free_daily_limit
+
+async def set_daily_limit(limit: int):
+    async with aiosqlite.connect(settings.database_url) as db:
+        await db.execute(
+            "INSERT INTO app_settings(key,value) VALUES('daily_limit',?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value", (str(limit),)
+        )
+        await db.commit()
+
+
+async def get_summary(user_id: int) -> str:
+    async with aiosqlite.connect(settings.database_url) as db:
+        cur = await db.execute("SELECT summary FROM user_summaries WHERE user_id=?", (user_id,))
+        row = await cur.fetchone()
+    return row[0] if row else ""
+
+async def get_compaction_batch(user_id: int, keep_recent: int, threshold: int):
+    async with aiosqlite.connect(settings.database_url) as db:
+        cur = await db.execute("SELECT COUNT(*) FROM messages WHERE user_id=?", (user_id,))
+        count = (await cur.fetchone())[0]
+        if count <= threshold:
+            return []
+        cur = await db.execute(
+            "SELECT id,role,content FROM messages WHERE user_id=? ORDER BY id ASC LIMIT ?",
+            (user_id, count - keep_recent),
+        )
+        return await cur.fetchall()
+
+async def save_summary_and_delete(user_id: int, summary: str, message_ids: list[int]):
+    if not message_ids:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    async with aiosqlite.connect(settings.database_url) as db:
+        await db.execute(
+            "INSERT INTO user_summaries(user_id,summary,updated_at) VALUES(?,?,?) "
+            "ON CONFLICT(user_id) DO UPDATE SET summary=excluded.summary,updated_at=excluded.updated_at",
+            (user_id, summary[:6000], now),
+        )
+        placeholders = ",".join("?" for _ in message_ids)
+        await db.execute(f"DELETE FROM messages WHERE user_id=? AND id IN ({placeholders})",
+                         [user_id, *message_ids])
+        await db.commit()
