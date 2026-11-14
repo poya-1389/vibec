@@ -1,29 +1,38 @@
-# VibeChatBot 1.0
+# VibeChatBot 1.2 — Vibe Ai Update
 
 Bilingual (Persian/English) AI assistant for Vibegram, using the Vibe Bot API gateway.
+Bot username: `@VibeChatBot` — created via https://botfather.vibegram.chat/
+
+## What is new in 1.2
+
+- **New Vibe role (VibeL 1.0):** public identity وایب / Vibe / Vibe Ai, model `VibeL 1.0` only, made by VibeChat (`@VibeChat`), creator Pouya (`@ThePouYa` support), Vibegram owner Shayan Heydari. The bot never reveals the underlying provider and never names any other company. Good behaviour is met warmly, bad behaviour gets a sharp human-like answer back (no profanity, no family insults).
+- **Exact start screen:** welcome text with glass buttons: Change language | Change model / Help | Support / Buy Premium. The premium button appears last in its own row.
+- **English buttons in sᴍᴀʟʟᴄᴀᴘS** (`ᴄʜᴀɴɢᴇ ʟᴀɴɢᴜᴀɢᴇ`, `ʜᴇʟᴘ`, `sᴜᴘᴘᴏʀᴛ`, `ʙᴜʏ ᴘʀᴇᴍɪᴜᴍ`, `✓ ᴠɪʙᴇʟ 1.0`).
+- **Admin panel** (`/admin`, owner only): full stats, broadcast to all users, daily-limit switch (unlimited / 20 / 50 / 100), runtime Premium purchase on/off toggle (no restart needed), manual grant/revoke of subscriptions, warning list and per-user warning reset, ban/unban by numeric ID.
+- **Automatic warnings:** insults against the bot, its creators or Vibegram are detected and the user automatically receives a formal warning; from the 3rd warning the owner is notified. Works in private chats and in groups the bot can read.
+- **Smart reactions:** the bot analyses the user's message (thanks, love, fun, sadness, doubt, greeting, question, praise) and reacts with a matching emoji via `setMessageReaction`. If the gateway does not support reactions, it is skipped silently.
+- **Typing indicator:** the "typing..." chat action runs while the AI generates, so chats feel like Mira/ChatGPT-style conversations.
+- **Group awareness:** when added to a group the bot sends a short greeting; it replies when mentioned or when someone replies to it; when the user replies to another person, the replied-to user's name, username and numeric ID are given to the model so Vibe can mention them correctly (HTML mention fallback for users without a username).
+- **Crash-proof sending:** every AI reply is sent as HTML with a plain-text fallback per chunk, so malformed model markup can never break a reply; user names are HTML-escaped.
+- **Memory:** free users keep 20 recent messages + a rolling summary after 40 stored; Premium keeps 50 + 100. `/reset` clears both. Default daily limit is unlimited; the owner can set one at runtime from the panel or `/quota`.
+- **Help rewritten:** only the essential commands remain (`/start`, `/help`, `/reset`, `/myid`); extra commands were removed from help.
 
 ## Included in this starter
+
 - Vibe Bot API base URL configuration (the documented aiogram base is `https://api.vibegram.chat`, without `/bot`)
 - Long polling using aiogram 3
-- Persian and English interface
-- Inline-button main menu (no emoji in bot-authored text)
+- Persian and English interface with inline-button main menu
 - Gemini then Groq fallback through OpenAI-compatible chat completions
-- Per-user conversation history in SQLite
-- Daily free quota
-- Pro entitlement with expiry
-- Telegram Stars invoice flow, pre-checkout validation and successful-payment handling
-- Owner-only basic statistics
+- Per-user conversation history and rolling summary in SQLite
+- Pro entitlement with expiry, Stars invoice flow, pre-checkout validation and successful-payment handling
 - Docker deployment
 
-## Important compatibility note about Stars
-The Vibegram documentation currently labels its gateway Telegram Bot API 7.x compatible and its visible method list does not explicitly document `sendInvoice`, `answerPreCheckoutQuery`, `pre_checkout_query`, or `successful_payment`. Therefore Stars are feature-gated and disabled by default.
+## Important compatibility notes (verified against the docs)
 
-1. Deploy with `ENABLE_STARS=false`.
-2. Verify on Vibegram that `sendInvoice` with currency `XTR` is accepted, that pre-checkout updates arrive, and that successful-payment updates are delivered.
-3. Only then set `ENABLE_STARS=true` and restart.
-4. Do not sell paid access until an end-to-end test purchase and duplicate-update test pass.
-
-For digital services on Telegram, Telegram's rules require Stars (`XTR`). The standard flow is invoice -> pre-checkout -> successful payment; persist the charge ID and provide `/paysupport`.
+- The Vibegram docs claim full Telegram Bot API compatibility but explicitly document only the basic messaging methods (`getMe`, `sendMessage`, `sendPhoto`, `sendDocument`, `sendVoice`, `sendVideo`, `editMessageText`, `deleteMessage`, `setWebhook`, `getWebhookInfo`, `deleteWebhook`). Reactions, chat-member updates and Stars are **not** in the documented list.
+- Therefore: reactions and the group greeting are wrapped in silent try/except — if the gateway rejects them, the bot keeps working without them.
+- **Colored buttons:** the documented API has no button-color parameter, so no unknown fields are sent (that would risk 400 errors). Buttons render with the messenger's own glass style; when Vibegram documents a color parameter, add it to `menu()` in `app/main.py`.
+- **Stars are feature-gated:** disabled by default. Verify on Vibegram that `sendInvoice` with currency `XTR`, pre-checkout and successful-payment updates work, then either set `ENABLE_STARS=true` before first run or flip "خرید پرمیوم" in `/admin` at runtime.
 
 ## Setup
 
@@ -31,7 +40,7 @@ For digital services on Telegram, Telegram's rules require Stars (`XTR`). The st
 2. Copy `.env.example` to `.env`.
 3. Set `VIBE_BOT_TOKEN`.
 4. Add at least one AI provider key (`GEMINI_API_KEY` or `GROQ_API_KEY`).
-5. Set `OWNER_ID` to the numeric Vibe user ID of the owner.
+5. Set `OWNER_ID` to the numeric Vibe user ID of the owner (get it from the bot with `/myid`). Without it the admin panel stays off.
 6. Run:
 
 ```bash
@@ -49,38 +58,31 @@ cp .env.example .env
 python -m app.main
 ```
 
-## Cloud deployment
+## Cloud deployment (GitHub + free hosting)
 
-Use any always-on Docker host that supports persistent volumes. Mount `/data` persistently because the SQLite database lives there. Set the variables from `.env.example` in the host's secret/environment settings. Do not commit `.env` or tokens to Git.
+- Push the `vibechatbot/` folder to GitHub (never commit `.env`).
+- On a free deploy service use the Dockerfile; mount or persist `/data` if the platform supports volumes, because the SQLite database lives there. Free tiers that sleep or wipe storage will lose history and subscriptions.
+- Set all variables from `.env.example` in the platform's environment/secret settings.
 
-A free cloud tier may sleep, limit hours, or delete local storage. For reliable bot polling, use an always-on worker and persistent disk. SQLite is suitable for the initial single-instance bot; migrate to PostgreSQL before running multiple replicas.
+## Admin panel reference (`/admin`)
 
-## AI provider costs and limits
+| Button | Action |
+| --- | --- |
+| آمار کامل | users, active subs, total/today messages, warnings, bans |
+| پخش پیام | broadcast a message to every registered user |
+| محدودیت روزانه | unlimited / 20 / 50 / 100 messages per day |
+| خرید پرمیوم | toggle premium purchase on/off at runtime |
+| اعطای اشتراک | `user_id days` — grant Pro manually |
+| لغو اشتراک | revoke a Pro subscription |
+| اخطارها / پاک‌کردن اخطار | list recent warnings / reset a user's warnings |
+| بن کاربر / رفع بن | block or unblock a user by numeric ID |
 
-Gemini and Groq free tiers are subject to provider-specific rate limits and model availability. This project falls back to Groq if Gemini errors. It does not promise unlimited free inference. Review provider terms and quotas before launch.
-
-## Current scope / next development steps
-
-This is an executable MVP, not a full Mira clone. It does not yet implement image generation, voice transcription, web search, group moderation, Mini App, advanced agent tools, admin web dashboard, refunds, or subscription auto-renewal. Add these as separate modules after confirming the gateway's supported methods and event types.
+While an input is expected, send `/cancel` to abort.
 
 ## Security checklist
-- Keep bot and AI keys in cloud secrets, never source control.
+
+- Keep bot and AI keys in cloud secrets, never in source control.
 - Set `OWNER_ID` to a numeric account ID.
 - Back up `/data`.
-- Add privacy notice and data deletion flow before public launch.
-- Add rate limiting and abuse monitoring before opening to large audiences.
-- Test Stars in a test environment first.
-
-
-## VibeL 1.0 personality and controls (v1.1)
-
-- Public identity: Vibe / وایب, presented as VibeL 1.0 by VibeChat.
-- Support: `@ThePouYa`; creator: Pouya; creator channel: `@VibeChat`.
-- Persian/English welcome menu: Change language, Change model, Help, Support, Buy Premium.
-- The only selectable model label is `VibeL 1.0`. The configured AI provider remains an implementation detail.
-- Daily message limit defaults to unlimited (`FREE_DAILY_LIMIT=0`). The owner can set it at runtime with `/quota 20` or disable it with `/quota off`. `OWNER_ID` must be set to the owner's numeric Vibe user ID for owner commands.
-- Conversation memory: regular users retain 20 recent messages plus a rolling summary compacted after 40 stored messages; Pro users retain 50 recent messages plus a rolling summary compacted after 100 stored messages. `/reset` clears both recent history and summary.
-- In groups, the bot responds only when mentioned or when a user replies to a bot message. The bot must be allowed to receive those updates by the group privacy/access settings.
-- Text capabilities include conversation, translation, summarization, writing, coding/debugging, tutoring, brainstorming, analysis of supplied text, planning and context-aware replies.
-- Automatic group warnings, message reactions, media/file understanding, web search, and colored button styles are not enabled in this release. They require additional implementation and confirmation that Vibegram's deployed API supports the corresponding Telegram methods.
-- Vibegram's published developer page currently describes compatibility with Telegram Bot API 7.x and lists standard message/chat/file methods, long polling, webhooks and Mini Apps. Do not assume newer Telegram Bot API 10.x features are available on Vibegram until verified.
+- Test Stars in a test environment first; do not sell access until an end-to-end purchase passes.
+- In groups, the bot only receives what Telegram-style privacy allows; to read all group messages, disable privacy mode for the bot in Vibe BotFather or make it an admin.
