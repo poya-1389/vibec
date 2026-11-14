@@ -1,0 +1,9 @@
+services:
+  vibechatbot:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - vibechat_data:/data
+volumes:
+  vibechat_data:
